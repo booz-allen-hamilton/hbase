@@ -1,10 +1,22 @@
 HBase Change Log
+Release 0.90.1-Coprocessor - Unreleased
+
+NEW FEATURES
+   HBASE-2002  Coprocessors: Client side support; Support RPC interface
+               changes at runtime (Gary Helmling via Andrew Purtell)
+               
+IMPROVEMENTS
+   HBASE-2001  Coprocessors: Colocate user code with regions (Mingjie Lai via
+               Andrew Purtell)
+
 Release 0.90.1 - February 9th, 2011
 
   NEW FEATURES
    HBASE-3455  Add memstore-local allocation buffers to combat heap
                fragmentation in the region server. Experimental / disabled
                by default in 0.90.1
+   HBASE-2002  Coprocessors: Client side support; Support RPC interface
+               changes at runtime (Gary Helmling via Andrew Purtell)
 
   BUG FIXES
    HBASE-3387  Revert 'Pair does not deep check arrays for equality'
@@ -78,9 +90,6 @@ Release 0.90.0 - January 19th, 2011
    HBASE-2641  HBASE-2641 Refactor HLog splitLog, hbase-2437 continued;
                break out split code as new classes
                (James Kennedy via Stack)
-   HBASE-2002  Coprocessors: Client side support; Support RPC interface
-               changes at runtime (Gary Helmling via Andrew Purtell)
-
 
   BUG FIXES
    HBASE-1791  Timeout in IndexRecordWriter (Bradford Stephens via Andrew

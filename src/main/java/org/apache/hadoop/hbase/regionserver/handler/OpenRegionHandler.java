@@ -260,7 +260,7 @@ public class OpenRegionHandler extends EventHandler {
       // Instantiate the region.  This also periodically tickles our zk OPENING
       // state so master doesn't timeout this region in transition.
       region = HRegion.openHRegion(this.regionInfo, this.rsServices.getWAL(),
-        this.server.getConfiguration(), this.rsServices.getFlushRequester(),
+        this.server.getConfiguration(), this.rsServices,
         new CancelableProgressable() {
           public boolean progress() {
             // We may lose the znode ownership during the open.  Currently its

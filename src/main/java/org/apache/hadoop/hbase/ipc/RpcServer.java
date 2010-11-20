@@ -63,4 +63,6 @@ public interface RpcServer {
   void openServer();
 
   void startThreads();
+
+  HBaseRpcMetrics getRpcMetrics();
 }
