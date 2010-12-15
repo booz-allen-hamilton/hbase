@@ -1116,27 +1116,29 @@ public class HRegion implements HeapSize { // , Writable{
    */
   public Result getClosestRowBefore(final byte [] row, final byte [] family)
   throws IOException {
-    Result result = null;
+    if (coprocessorHost != null) {
+      Result result = new Result();
+      if (coprocessorHost.preGetClosestRowBefore(row, family, result)) {
+        return result;
+      }
+    }
     // look across all the HStores for this region and determine what the
     // closest key is across all column families, since the data may be sparse
-    KeyValue key = null;
     checkRow(row);
     startRegionOperation();
-    if (coprocessorHost != null) {
-      coprocessorHost.preGetClosestRowBefore(row, family);
-    }
     try {
       Store store = getStore(family);
       KeyValue kv = new KeyValue(row, HConstants.LATEST_TIMESTAMP);
       // get the closest key. (HStore.getRowKeyAtOrBefore can return null)
-      key = store.getRowKeyAtOrBefore(kv);
+      KeyValue key = store.getRowKeyAtOrBefore(kv);
+      Result result = null;
       if (key != null) {
         Get get = new Get(key.getRow());
         get.addFamily(family);
         result = get(get, null);
       }
       if (coprocessorHost != null) {
-        result = coprocessorHost.postGetClosestRowBefore(row, family, result);
+        coprocessorHost.postGetClosestRowBefore(row, family, result);
       }
       return result;
     } finally {
@@ -1154,8 +1156,7 @@ public class HRegion implements HeapSize { // , Writable{
    * @return InternalScanner
    * @throws IOException read exceptions
    */
-  public InternalScanner getScanner(Scan scan)
-  throws IOException {
+  public InternalScanner getScanner(Scan scan) throws IOException {
    return getScanner(scan, null);
   }
 
@@ -1179,13 +1180,17 @@ public class HRegion implements HeapSize { // , Writable{
     }
   }
 
-  protected InternalScanner instantiateInternalScanner(Scan scan, List<KeyValueScanner> additionalScanners) throws IOException {
+  protected InternalScanner instantiateInternalScanner(Scan scan,
+      List<KeyValueScanner> additionalScanners) throws IOException {
+    InternalScanner s = null;
     if (coprocessorHost != null) {
-      coprocessorHost.preScannerOpen(scan);
+      s = coprocessorHost.preScannerOpen(scan);
     }
-    InternalScanner s = new RegionScanner(scan, additionalScanners);
+    if (s == null) {
+      s = new RegionScanner(scan, additionalScanners);
+    }
     if (coprocessorHost != null) {
-      coprocessorHost.postScannerOpen(scan, s.hashCode());
+      s = coprocessorHost.postScannerOpen(scan, s);
     }
     return s;
   }
@@ -1247,17 +1252,20 @@ public class HRegion implements HeapSize { // , Writable{
    * @throws IOException
    */
   public void delete(Map<byte[], List<KeyValue>> familyMap, boolean writeToWAL)
-  throws IOException {
+      throws IOException {
+    /* Run coprocessor pre hook outside of locks to avoid deadlock */
+    if (coprocessorHost != null) {
+      if (coprocessorHost.preDelete(familyMap, writeToWAL)) {
+        return;
+      }
+    }
+
     long now = EnvironmentEdgeManager.currentTimeMillis();
     byte [] byteNow = Bytes.toBytes(now);
     boolean flush = false;
 
     updatesLock.readLock().lock();
     try {
-      if (coprocessorHost != null) {
-        familyMap = coprocessorHost.preDelete(familyMap);
-      }
-
       for (Map.Entry<byte[], List<KeyValue>> e : familyMap.entrySet()) {
 
         byte[] family = e.getKey();
@@ -1322,7 +1330,7 @@ public class HRegion implements HeapSize { // , Writable{
       flush = isFlushSize(memstoreSize.addAndGet(addedSize));
 
       if (coprocessorHost != null) {
-        coprocessorHost.postDelete(familyMap);
+        coprocessorHost.postDelete(familyMap, writeToWAL);
       }
     } finally {
       this.updatesLock.readLock().unlock();
@@ -1460,7 +1468,29 @@ public class HRegion implements HeapSize { // , Writable{
     return batchOp.retCodes;
   }
 
+  @SuppressWarnings("unchecked")
   private long doMiniBatchPut(BatchOperationInProgress<Pair<Put, Integer>> batchOp) throws IOException {
+    /* Run coprocessor pre hook outside of locks to avoid deadlock */
+    if (coprocessorHost != null) {
+      List<Pair<Put, Integer>> ops =
+        new ArrayList<Pair<Put, Integer>>(batchOp.operations.length);
+      for (int i = 0; i < batchOp.operations.length; i++) {
+        Pair<Put, Integer> nextPair = batchOp.operations[i];
+        Put put = nextPair.getFirst();
+        Map<byte[], List<KeyValue>> familyMap = put.getFamilyMap();
+        if (coprocessorHost.prePut(familyMap, put.getWriteToWAL())) {
+          // pre hook says skip this Put
+          // adjust nextIndexToProcess if we skipped before it
+          if (batchOp.nextIndexToProcess > i) {
+            batchOp.nextIndexToProcess--;
+          }
+          continue;
+        }
+        ops.add(nextPair);
+      }
+      batchOp.operations = ops.toArray(new Pair[ops.size()]);
+    }
+
     long now = EnvironmentEdgeManager.currentTimeMillis();
     byte[] byteNow = Bytes.toBytes(now);
     boolean locked = false;
@@ -1468,8 +1498,7 @@ public class HRegion implements HeapSize { // , Writable{
     /** Keep track of the locks we hold so we can release them in finally clause */
     List<Integer> acquiredLocks = Lists.newArrayListWithCapacity(batchOp.operations.length);
     // reference family maps directly so coprocessors can mutate them if desired
-    Map<byte[],List<KeyValue>>[] familyMaps =
-        new Map[batchOp.operations.length];
+    Map<byte[],List<KeyValue>>[] familyMaps = new Map[batchOp.operations.length];
     // We try to set up a batch in the range [firstIndex,lastIndexExclusive)
     int firstIndex = batchOp.nextIndexToProcess;
     int lastIndexExclusive = firstIndex;
@@ -1486,12 +1515,6 @@ public class HRegion implements HeapSize { // , Writable{
         Integer providedLockId = nextPair.getSecond();
 
         Map<byte[], List<KeyValue>> familyMap = put.getFamilyMap();
-        // Check any loaded coprocessors
-        /* TODO: we should catch any throws coprocessor exceptions here to allow the
-           rest of the batch to continue.  This means fixing HBASE-2898 */
-        if (coprocessorHost != null) {
-          familyMap = coprocessorHost.prePut(familyMap);
-        }
         // store the family map reference to allow for mutations
         familyMaps[lastIndexExclusive] = familyMap;
 
@@ -1564,15 +1587,22 @@ public class HRegion implements HeapSize { // , Writable{
       long addedSize = 0;
       for (int i = firstIndex; i < lastIndexExclusive; i++) {
         if (batchOp.retCodes[i] != OperationStatusCode.NOT_RUN) continue;
-
         addedSize += applyFamilyMapToMemstore(familyMaps[i]);
         batchOp.retCodes[i] = OperationStatusCode.SUCCESS;
+      }
 
-        // execute any coprocessor post-hooks
-        if (coprocessorHost != null) {
-          coprocessorHost.postDelete(familyMaps[i]);
+      // ------------------------------------
+      // STEP 5. Run coprocessor post hooks
+      // ------------------------------------
+      if (coprocessorHost != null) {
+        for (int i = firstIndex; i < lastIndexExclusive; i++) {
+          // only for successful puts
+          if (batchOp.retCodes[i] != OperationStatusCode.SUCCESS) continue;
+          Put p = batchOp.operations[i].getFirst();
+          coprocessorHost.postPut(familyMaps[i], p.getWriteToWAL());
         }
       }
+
       success = true;
       return addedSize;
     } finally {
@@ -1754,8 +1784,14 @@ public class HRegion implements HeapSize { // , Writable{
    * @param writeToWAL if true, then we should write to the log
    * @throws IOException
    */
-  private void put(Map<byte [], List<KeyValue>> familyMap,
-    boolean writeToWAL) throws IOException {
+  private void put(Map<byte [], List<KeyValue>> familyMap, boolean writeToWAL)
+      throws IOException {
+    /* run pre put hook outside of lock to avoid deadlock */
+    if (coprocessorHost != null) {
+      if (coprocessorHost.prePut(familyMap, writeToWAL)) {
+        return;
+      }
+    }
 
     long now = EnvironmentEdgeManager.currentTimeMillis();
     byte[] byteNow = Bytes.toBytes(now);
@@ -1763,9 +1799,6 @@ public class HRegion implements HeapSize { // , Writable{
 
     this.updatesLock.readLock().lock();
     try {
-      if (coprocessorHost != null) {
-        familyMap = coprocessorHost.prePut(familyMap);
-      }
       checkFamilies(familyMap.keySet());
       updateKVTimestamps(familyMap.values(), byteNow);
       // write/sync to WAL should happen before we touch memstore.
@@ -1782,13 +1815,14 @@ public class HRegion implements HeapSize { // , Writable{
 
       long addedSize = applyFamilyMapToMemstore(familyMap);
       flush = isFlushSize(memstoreSize.addAndGet(addedSize));
-
-      if (coprocessorHost != null) {
-        coprocessorHost.postPut(familyMap);
-      }
     } finally {
       this.updatesLock.readLock().unlock();
     }
+
+    if (coprocessorHost != null) {
+      coprocessorHost.postPut(familyMap, writeToWAL);
+    }
+
     if (flush) {
       // Request a cache flush.  Do it outside update lock.
       requestFlush();
@@ -2387,6 +2421,14 @@ public class HRegion implements HeapSize { // , Writable{
 
     public synchronized boolean next(List<KeyValue> outResults, int limit)
         throws IOException {
+      if (coprocessorHost != null) {
+        Boolean result = coprocessorHost.preScannerNext((InternalScanner)this,
+          outResults, limit);
+        if (result != null) {
+          return result.booleanValue();
+        }
+      }
+
       if (this.filterClosed) {
         throw new UnknownScannerException("Scanner was closed (timed out?) " +
             "after we renewed it. Could be caused by a very slow scanner " +
@@ -2400,14 +2442,11 @@ public class HRegion implements HeapSize { // , Writable{
 
         results.clear();
 
-        if (coprocessorHost != null) {
-          coprocessorHost.preScannerNext(hashCode());
-        }
-
         boolean returnResult = nextInternal(limit);
 
         if (coprocessorHost != null) {
-          results = coprocessorHost.postScannerNext(hashCode(), results);
+          returnResult = coprocessorHost.postScannerNext((InternalScanner)this,
+            results, limit, returnResult);
         }
 
         outResults.addAll(results);
@@ -2453,8 +2492,10 @@ public class HRegion implements HeapSize { // , Writable{
           do {
             this.storeHeap.next(results, limit - results.size());
             if (limit > 0 && results.size() == limit) {
-              if (this.filter != null && filter.hasFilterRow()) throw new IncompatibleFilterException(
+              if (this.filter != null && filter.hasFilterRow()) {
+                throw new IncompatibleFilterException(
                   "Filter with filterRow(List<KeyValue>) incompatible with scan with limit!");
+              }
               return true; // we are expecting more yes, but also limited to how many we can return.
             }
           } while (Bytes.equals(currentRow, nextRow = peekRow()));
@@ -2517,7 +2558,9 @@ public class HRegion implements HeapSize { // , Writable{
 
     public synchronized void close() throws IOException {
       if (coprocessorHost != null) {
-        coprocessorHost.preScannerClose(hashCode());
+        if (coprocessorHost.preScannerClose((InternalScanner)this)) {
+          return;
+        }
       }
       if (storeHeap != null) {
         storeHeap.close();
@@ -2525,7 +2568,7 @@ public class HRegion implements HeapSize { // , Writable{
       }
       this.filterClosed = true;
       if (coprocessorHost != null) {
-        coprocessorHost.postScannerClose(hashCode());
+        coprocessorHost.postScannerClose((InternalScanner)this);
       }
     }
   }
@@ -3102,32 +3145,27 @@ public class HRegion implements HeapSize { // , Writable{
   throws IOException {
     Scan scan = new Scan(get);
 
-    List<KeyValue> results = null;
-    List<KeyValue> getResults = new ArrayList<KeyValue>();
+    List<KeyValue> results = new ArrayList<KeyValue>();
 
     // pre-get CP hook
     if (withCoprocessor && (coprocessorHost != null)) {
-      get = coprocessorHost.preGet(get);
+       if (coprocessorHost.preGet(get, results)) {
+         return results;
+       }
     }
 
     InternalScanner scanner = null;
     try {
       scanner = getScanner(scan);
-      scanner.next(getResults);
+      scanner.next(results);
     } finally {
       if (scanner != null)
         scanner.close();
     }
-    // append get results to pre-get results
-    if (results != null){
-      results.addAll(getResults);
-    }
-    else {
-      results = getResults;
-    }
+
     // post-get CP hook
     if (withCoprocessor && (coprocessorHost != null)) {
-      results = coprocessorHost.postGet(get, results);
+      coprocessorHost.postGet(get, results);
     }
 
     return results;
