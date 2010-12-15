@@ -10,6 +10,11 @@ Release 0.91.0 - Unreleased
   IMPROVEMENTS
    HBASE-2001  Coprocessors: Colocate user code with regions (Mingjie Lai via
                Andrew Purtell)
+   HBASE-3345  Coprocessors: Allow observers to completely override base
+               function
+
+
+  NEW FEATURES
 
 
 Release 0.90.0 - Unreleased
