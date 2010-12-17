@@ -12,6 +12,7 @@ Release 0.91.0 - Unreleased
                Andrew Purtell)
    HBASE-3345  Coprocessors: Allow observers to completely override base
                function
+   HBASE-3260  Coprocessors: Add explicit lifecycle management
 
 
   NEW FEATURES
