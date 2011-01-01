@@ -21,6 +21,7 @@ package org.apache.hadoop.hbase.client.coprocessor;
 
 import org.apache.hadoop.hbase.io.HbaseObjectWritable;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Classes;
 import org.apache.hadoop.io.Writable;
 
 import java.io.DataInput;
@@ -86,28 +87,10 @@ public class ExecResult implements Writable {
     regionName = Bytes.readByteArray(in);
     value = HbaseObjectWritable.readObject(in, null);
     String className = in.readUTF();
-    if(className.equals("boolean")){
-      valueType = boolean.class;
-    } else if (className.equals("byte")){
-      valueType = byte.class;
-    } else if (className.equals("short")){
-      valueType = short.class;
-    } else if (className.equals("int")){
-      valueType = int.class;
-    } else if (className.equals("long")){
-      valueType = long.class;
-    } else if (className.equals("float")){
-      valueType = float.class;
-    } else if (className.equals("double")){
-      valueType = double.class;
-    } else if (className.equals("char")){
-      valueType = char.class;
-    } else {
-      try {
-        valueType = Class.forName(className);
-      } catch (ClassNotFoundException e) {
-        throw new IOException("Unable to find class of type: " + className );
-      }
+    try {
+      valueType = Classes.extendedForName(className);
+    } catch (ClassNotFoundException e) {
+      throw new IOException("Unable to find class of type: " + className );
     }
   }
 }

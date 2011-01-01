@@ -14,6 +14,9 @@ Release 0.90.1-Coprocessor - Unreleased
    HBASE-2001  Coprocessors: Colocate user code with regions (Mingjie Lai via
                Andrew Purtell)
    HBASE-3260  Coprocessors: Add explicit lifecycle management
+   
+  BUG FIXES
+   HBASE-3400 Support for generics in coprocessor protocol interfaces
 
 Release 0.90.1 - February 9th, 2011
 

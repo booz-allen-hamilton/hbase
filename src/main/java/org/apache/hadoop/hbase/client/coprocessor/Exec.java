@@ -26,6 +26,7 @@ import org.apache.hadoop.hbase.io.HbaseObjectWritable;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
 import org.apache.hadoop.hbase.ipc.Invocation;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Classes;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -108,7 +109,7 @@ public class Exec extends Invocation implements Row {
         this.conf);
       String parameterClassName = in.readUTF();
       try {
-        parameterClasses[i] = Class.forName(parameterClassName);
+        parameterClasses[i] = Classes.extendedForName(parameterClassName);
       } catch (ClassNotFoundException e) {
         throw new IOException("Couldn't find class: " + parameterClassName);
       }
