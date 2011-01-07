@@ -26,7 +26,6 @@ import org.apache.hadoop.ipc.VersionedProtocol;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 
 /**
  */
@@ -59,6 +58,8 @@ public interface RpcServer {
   void setErrorHandler(HBaseRPCErrorHandler handler);
 
   void setQosFunction(Function<Writable, Integer> newFunc);
+  
+  HBaseRpcMetrics getRpcMetrics();
 
   void openServer();
 
