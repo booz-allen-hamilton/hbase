@@ -796,6 +796,17 @@ Release 0.90.0 - Unreleased
    HBASE-3402  Web UI shows two META regions
    HBASE-3409  Failed server shutdown processing when retrying hlog split
    HBASE-3410  Unable to set/modify TTL on a column family using the shell
+   HBASE-3412  HLogSplitter should handle missing HLogs
+   HBASE-3420  Handling a big rebalance, we can queue multiple instances
+               of a Close event; messes up state
+   HBASE-3423  hbase-env.sh over-rides HBASE_OPTS incorrectly (Ted Dunning via
+               Andrew Purtell)
+   HBASE-3407  hbck should pause between fixing and re-checking state
+   HBASE-3401  Region IPC operations should be high priority
+   HBASE-3418  Increment operations can break when qualifiers are split
+               between memstore/snapshot and storefiles
+   HBASE-3403  Region orphaned after failure during split
+   HBASE-3430  hbase-daemon.sh should clean up PID files on process stop
 
 
   IMPROVEMENTS
@@ -1286,6 +1297,7 @@ Release 0.90.0 - Unreleased
    HBASE-3349  Pass HBase configuration to HttpServer
    HBASE-3372  HRS shouldn't print a full stack for ServerNotRunningException
    HBASE-3377  Upgrade Jetty to 6.1.26
+   HBASE-3405  Allow HBaseRpcMetrics to register custom interface methods
 
 
   NEW FEATURES
