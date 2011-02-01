@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
@@ -36,6 +37,8 @@ import org.apache.hadoop.hbase.client.coprocessor.Batch.Callback;
 import org.apache.hadoop.hbase.coprocessor.*;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
+import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.VersionInfo;
 import org.apache.hadoop.util.StringUtils;
@@ -995,6 +998,54 @@ public class RegionCoprocessorHost
       for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postScannerClose(env, s);
+          if (env.shouldComplete()) {
+            break;
+          }
+        }
+      }
+    } finally {
+      coprocessorLock.readLock().unlock();
+    }
+  }
+
+  /**
+   * @param info
+   * @param logKey
+   * @param logEdit
+   * @throws IOException
+   */
+  public void preWALRestore(HRegionInfo info, HLogKey logKey,
+      WALEdit logEdit) throws IOException {
+    try {
+      coprocessorLock.readLock().lock();
+      for (RegionEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).preWALRestore(env, info, logKey,
+              logEdit);
+          if (env.shouldComplete()) {
+            break;
+          }
+        }
+      }
+    } finally {
+      coprocessorLock.readLock().unlock();
+    }
+  }
+
+  /**
+   * @param info
+   * @param logKey
+   * @param logEdit
+   * @throws IOException
+   */
+  public void postWALRestore(HRegionInfo info, HLogKey logKey,
+      WALEdit logEdit) throws IOException {
+    try {
+      coprocessorLock.readLock().lock();
+      for (RegionEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).postWALRestore(env, info,
+              logKey, logEdit);
           if (env.shouldComplete()) {
             break;
           }
