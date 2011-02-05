@@ -18,6 +18,15 @@ Release 0.91.0 - Unreleased
    HBASE-3493  HMaster sometimes hangs during initialization due to missing
                notify call (Bruno Dumon via Stack)
    HBASE-3483  Memstore lower limit should trigger asynchronous flushes
+   HBASE-3494  checkAndPut implementation doesnt verify row param and writable 
+   	       row are the same
+   HBASE-3416  For intra-row scanning, the update readers notification resets
+               the query matcher and can lead to incorrect behavior
+   HBASE-3495  Shell is failing on subsequent split calls
+   HBASE-3502  Can't open region because can't open .regioninfo because
+               AlreadyBeingCreatedException
+   HBASE-3501  Remove the deletion limit in LogCleaner
+
 
 
   IMPROVEMENTS
