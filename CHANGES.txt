@@ -11,6 +11,22 @@ Release 0.91.0 - Unreleased
    HBASE-3445  Master crashes on data that was moved from different host
    HBASE-3449  Server shutdown handlers deadlocked waiting for META
    HBASE-3456  Fix hardcoding of 20 second socket timeout down in HBaseClient
+   HBASE-3476  HFile -m option need not scan key values
+               (Prakash Khemani via Lars George)
+   HBASE-3481  max seq id in flushed file can be larger than its correct 
+               value causing data loss during recovery
+   HBASE-3493  HMaster sometimes hangs during initialization due to missing
+               notify call (Bruno Dumon via Stack)
+   HBASE-3483  Memstore lower limit should trigger asynchronous flushes
+   HBASE-3494  checkAndPut implementation doesnt verify row param and writable 
+   	       row are the same
+   HBASE-3416  For intra-row scanning, the update readers notification resets
+               the query matcher and can lead to incorrect behavior
+   HBASE-3495  Shell is failing on subsequent split calls
+   HBASE-3502  Can't open region because can't open .regioninfo because
+               AlreadyBeingCreatedException
+   HBASE-3501  Remove the deletion limit in LogCleaner
+
 
 
   IMPROVEMENTS
@@ -23,6 +39,8 @@ Release 0.91.0 - Unreleased
    HBASE-2001  Coprocessors: Colocate user code with regions (Mingjie Lai via
                Andrew Purtell)
    HBASE-3256  Coprocessors: Coprocessor host and observer for HMaster
+   HBASE-3305  Allow round-robin distribution for table created with
+               multiple regions (ted yu via jgray)
 
 
 Release 0.90.0 - January 19th, 2011
