@@ -49,7 +49,17 @@ Release 0.90.1 - February 9th, 2011
    HBASE-3531  When under global memstore pressure, dont try to flush
                unflushable regions.
 
+
   IMPROVEMENTS
+   HBASE-3345  Coprocessors: Allow observers to completely override base
+               function
+   HBASE-3260  Coprocessors: Add explicit lifecycle management
+
+
+  NEW FEATURES
+   HBASE-2001  Coprocessors: Colocate user code with regions (Mingjie Lai via
+               Andrew Purtell)
+   HBASE-3256  Coprocessors: Coprocessor host and observer for HMaster
    HBASE-3305  Allow round-robin distribution for table created with
                multiple regions (ted yu via jgray)
    HBASE-3508  LruBlockCache statistics thread should have a name

@@ -59,10 +59,10 @@ public interface RpcServer {
   void setErrorHandler(HBaseRPCErrorHandler handler);
 
   void setQosFunction(Function<Writable, Integer> newFunc);
+  
+  HBaseRpcMetrics getRpcMetrics();
 
   void openServer();
 
   void startThreads();
-
-  HBaseRpcMetrics getRpcMetrics();
 }
